@@ -5,6 +5,7 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from Borrowing.telegram_send import send_telegram_message
 from Payment.models import Payment
 from Payment.serializers import PaymentSerializer, PaymentDetailSerializer
 
@@ -57,8 +58,18 @@ class PaymentSuccessView(APIView):
 
         if session.payment_status == "paid":
             payment = get_object_or_404(Payment, session_id=session_id)
-            payment.status = "PAID"
-            payment.save()
+            if payment.status != "PAID":
+                payment.status = "PAID"
+                payment.save()
+
+                # 🎯 Уведомление
+                send_telegram_message(
+                    f"✅ Оплата прошла успешно\n"
+                    f"👤 {payment.borrowing.user.email}\n"
+                    f"📘 {payment.borrowing.book.title}\n"
+                    f"💰 ${payment.money_to_pay} ({payment.type})"
+                )
+
             return Response({"message": "Payment completed successfully!"})
 
         return Response({"message": "Payment is not completed."}, status=400)
@@ -67,4 +78,3 @@ class PaymentSuccessView(APIView):
 class PaymentCancelView(APIView):
     def get(self, request):
         return Response({"message": "Payment was cancelled. You can retry later."})
-

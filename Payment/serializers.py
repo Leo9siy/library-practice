@@ -20,7 +20,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 
 class PaymentDetailSerializer(PaymentSerializer):
-    def __init(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         from Borrowing.serializers import BorrowingSerializer
         self.fields["borrowing"] = BorrowingSerializer(read_only=True)
         super().__init__(*args, **kwargs)
