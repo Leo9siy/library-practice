@@ -61,7 +61,8 @@ class BorrowingDetailSerializer(serializers.ModelSerializer):
 class ReturnBorrowingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Borrowing
-        fields = ["actual_return_date"]
+        fields = ["expected_return_date"]
+        read_only_fields = ["expected_return_date"]
 
     def validate(self, attrs):
         if self.instance.actual_return_date:
