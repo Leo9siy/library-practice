@@ -6,12 +6,12 @@ from rest_framework.response import Response
 
 from Borrowing.models import Borrowing
 from Borrowing.serializers import BorrowingSerializer, BorrowingDetailSerializer, ReturnBorrowingSerializer
-import requests
 
 from Borrowing.telegram_send import send_telegram_message
 
 
 class BorrowingViewSet(viewsets.ModelViewSet):
+
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
             return BorrowingDetailSerializer
@@ -20,6 +20,11 @@ class BorrowingViewSet(viewsets.ModelViewSet):
             return ReturnBorrowingSerializer
 
         return BorrowingSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

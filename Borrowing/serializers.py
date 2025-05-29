@@ -1,9 +1,13 @@
 from datetime import date, timedelta
 
+from django.conf import settings
 from rest_framework import serializers
 from rest_framework.relations import SlugRelatedField
 
 from Borrowing.models import Borrowing
+from Payment.models import Payment
+from Payment.serializers import PaymentSerializer
+from Payment.services import create_stripe_session
 
 
 class BorrowingSerializer(serializers.ModelSerializer):
@@ -36,11 +40,27 @@ class BorrowingSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
+        request = self.context.get("request")
+
         book = validated_data["book"]
         book.inventory -= 1
         book.save()
         borrowing = Borrowing.objects.create(**validated_data)
+
+        session_url, session_id = create_stripe_session(borrowing, request=request)
+        money_to_pay = (validated_data["expected_return_date"] - borrowing.borrow_date).days * borrowing.book.daily_fee
+
+        Payment.objects.create(
+            borrowing=borrowing,
+            status="PENDING",
+            type="PAYMENT",
+            session_url=session_url,
+            session_id=session_id,
+            money_to_pay=money_to_pay,
+        )
+
         return borrowing
+
 
 
 class BorrowingDetailSerializer(serializers.ModelSerializer):
@@ -52,10 +72,15 @@ class BorrowingDetailSerializer(serializers.ModelSerializer):
         slug_field="title",
         read_only=True,
     )
+    payments = PaymentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Borrowing
-        fields = ["id", "user", "book", "borrow_date", "expected_return_date", "actual_return_date"]
+        fields = [
+            "id", "user", "book",
+            "borrow_date", "expected_return_date", "actual_return_date",
+            "payments",
+        ]
 
 
 class ReturnBorrowingSerializer(serializers.ModelSerializer):
@@ -70,8 +95,30 @@ class ReturnBorrowingSerializer(serializers.ModelSerializer):
         return attrs
 
     def update(self, instance, validated_data):
-        instance.actual_return_date = date.today()
+        today = date.today()
+        instance.actual_return_date = today
         instance.book.inventory += 1
         instance.book.save()
         instance.save()
+
+        if today > instance.expected_return_date:
+            overdue_days = (today - instance.expected_return_date).days
+            fine_amount = overdue_days * instance.book.daily_fee * settings.FINE_MULTIPLIER
+
+            session_url, session_id = create_stripe_session(
+                instance,
+                payment_type="FINE",
+                amount_cents=int(fine_amount * 100),
+                description=f"Fine for '{instance.book.title}' - {overdue_days} days overdue"
+            )
+
+            Payment.objects.create(
+                borrowing=instance,
+                status="PENDING",
+                type="FINE",
+                session_url=session_url,
+                session_id=session_id,
+                money_to_pay=fine_amount,
+            )
+
         return instance

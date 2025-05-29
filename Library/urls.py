@@ -23,5 +23,5 @@ urlpatterns = [
     path("api/", include("Book.urls"), name="book"),
     path("api/user/", include("User.urls"), name="user"),
     path("api/", include("Borrowing.urls"), name="borrowing"),
-
+    path("api/", include("Payment.urls"), name="payment"),
 ]

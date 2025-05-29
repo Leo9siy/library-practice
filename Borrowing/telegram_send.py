@@ -1,12 +1,19 @@
+import os
+
+import dotenv
 import requests
 
 
+dotenv.load_dotenv()
+
 def send_telegram_message(text):
-    token = '7668162734:AAEVXIRp84sUuz3RzTbgcCdIjLQ_U3_yq6U'
-    chat_id = '7311564158'
+    token = os.getenv("TELEGRAM_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
     url = f'https://api.telegram.org/bot{token}/sendMessage'
     payload = {
-        'chat_id': chat_id, 'text': text
+        'chat_id': chat_id,
+        'text': text
     }
     try:
         response = requests.post(url, data=payload)
