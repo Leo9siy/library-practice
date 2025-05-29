@@ -6,11 +6,12 @@ from rest_framework.response import Response
 
 from Borrowing.models import Borrowing
 from Borrowing.serializers import BorrowingSerializer, BorrowingDetailSerializer, ReturnBorrowingSerializer
+import requests
+
+from Borrowing.telegram_send import send_telegram_message
 
 
 class BorrowingViewSet(viewsets.ModelViewSet):
-
-
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
             return BorrowingDetailSerializer
@@ -32,19 +33,21 @@ class BorrowingViewSet(viewsets.ModelViewSet):
         user = self.request.user
         queryset = Borrowing.objects.select_related("user", "book").all()
 
-        user_id = self.request.query_params.get("user_id")
-        if user.is_staff or user.is_superuser:
-            if user_id:
-                queryset = queryset.filter(user_id=user_id)
-        else:
+        if not (user.is_superuser or user.is_staff):
             queryset = queryset.filter(user=user)
+
+        user_id = self.request.query_params.get("user_id")
+        if user_id and (user.is_staff or user.is_superuser):
+            queryset = queryset.filter(user_id=user_id)
 
 
         is_active = self.request.query_params.get("is_active", None)
         if is_active is not None:
-            if is_active.lower() == "true":
+            is_active = is_active.lower()
+
+            if is_active == "true":
                 queryset = queryset.filter(actual_return_date__isnull=True)
-            else:
+            elif is_active == "false":
                 queryset = queryset.filter(actual_return_date__isnull=False)
 
         return queryset
@@ -54,20 +57,24 @@ class BorrowingViewSet(viewsets.ModelViewSet):
     def return_book(self, request, pk=None):
         borrowing = self.get_object()
 
-        if self.action == "GET":
-            if request.method == "GET":
-                if borrowing.actual_return_date:
-                    return Response(
-                        {"detail": "Book already returned"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+        if self.request.method == "GET":
+            if borrowing.actual_return_date:
                 return Response(
-                    {"detail": "You can return the book"},
-                    status=status.HTTP_200_OK
+                    {"detail": "Book already returned"},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
+            return Response(
+                {"detail": "You can return the book"},
+                status=status.HTTP_200_OK
+            )
 
         serializer = ReturnBorrowingSerializer(borrowing, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+
+        send_telegram_message(
+            f"📚 {borrowing.user.email} returned book: {borrowing.book.title}\n"
+            f"🕓 Returns date: {datetime.today().strftime('%Y-%m-%d')}"
+        )
 
         return Response(serializer.data, status=status.HTTP_200_OK)
