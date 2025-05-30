@@ -66,18 +66,18 @@ class BorrowingViewSet(viewsets.ModelViewSet):
                 type=OpenApiTypes.BOOL,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description="True — активные (не возвращённые) заимствования; False — завершённые."
+                description="True — active (not returned) borrowings; False — returned."
             ),
             OpenApiParameter(
                 name="user_id",
                 type=OpenApiTypes.INT,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description="(Только для админов) Показывает заимствования указанного пользователя."
+                description="(Only admins) Users borrowings."
             )
         ],
         responses={200: BorrowingSerializer(many=True)},  # ← заменишь на свой сериализатор
-        description="Получить список заимствований. Админы могут фильтровать по пользователю и статусу."
+        description="Take a Borrowings list, Admin can filter by id."
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
@@ -85,7 +85,7 @@ class BorrowingViewSet(viewsets.ModelViewSet):
     @extend_schema(
         request=BorrowingSerializer,
         responses={201: BorrowingDetailSerializer},
-        description="Создание заимствования. Уменьшает количество книг на складе и создаёт платёж в Stripe."
+        description="Create borrowing. Get down amount in inventory and created payment in strip."
     )
     def create(self, request, *args, **kwargs):
         return super().create(request, *args, **kwargs)
