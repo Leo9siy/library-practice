@@ -30,12 +30,23 @@ class BorrowingSerializer(serializers.ModelSerializer):
 
 
     def validate(self, data):
+
+        user = self.context["request"].user
+        has_pending = user.borrowings.filter(
+            payments__status="PENDING",
+            user=user,
+        ).exists()
+
+        if has_pending:
+            raise serializers.ValidationError({"non_field_errors": ["Unpaid payments detected."]})
+
         book = data["book"]
+
         if book.inventory <= 0:
-            raise serializers.ValidationError("Book is not available.")
+            raise serializers.ValidationError({"book": "Book is not available."})
 
         if "expected_return_date" not in data:
-            data["expected_return_date"] = date.today() + timedelta(days=14)
+            data["expected_return_date"] = date.today() + timedelta(days=60)
 
         return data
 
@@ -43,9 +54,12 @@ class BorrowingSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
 
         book = validated_data["book"]
+
         book.inventory -= 1
         book.save()
-        borrowing = Borrowing.objects.create(**validated_data)
+
+        borrowing = super().create(validated_data)
+
         money_to_pay = (validated_data["expected_return_date"] - borrowing.borrow_date).days * borrowing.book.daily_fee
 
         session_url, session_id = create_stripe_session(
@@ -55,7 +69,6 @@ class BorrowingSerializer(serializers.ModelSerializer):
             description=f"Payment for: {book.title}",
             payment_type="PAYMENT"
         )
-
 
         Payment.objects.create(
             borrowing=borrowing,
