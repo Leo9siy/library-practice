@@ -46,9 +46,16 @@ class BorrowingSerializer(serializers.ModelSerializer):
         book.inventory -= 1
         book.save()
         borrowing = Borrowing.objects.create(**validated_data)
-
-        session_url, session_id = create_stripe_session(borrowing, request=request)
         money_to_pay = (validated_data["expected_return_date"] - borrowing.borrow_date).days * borrowing.book.daily_fee
+
+        session_url, session_id = create_stripe_session(
+            borrowing,
+            request=request,
+            amount=money_to_pay,
+            description=f"Payment for: {book.title}",
+            payment_type="PAYMENT"
+        )
+
 
         Payment.objects.create(
             borrowing=borrowing,
@@ -60,7 +67,6 @@ class BorrowingSerializer(serializers.ModelSerializer):
         )
 
         return borrowing
-
 
 
 class BorrowingDetailSerializer(serializers.ModelSerializer):
@@ -92,6 +98,11 @@ class ReturnBorrowingSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         if self.instance.actual_return_date:
             raise serializers.ValidationError("This book is already returned.")
+
+        pending_fines = self.instance.payments.filter(type="FINE", status="PENDING")
+        if pending_fines.exists():
+            raise serializers.ValidationError("Cannot return book: fine payment is pending.")
+
         return attrs
 
     def update(self, instance, validated_data):
@@ -107,9 +118,10 @@ class ReturnBorrowingSerializer(serializers.ModelSerializer):
 
             session_url, session_id = create_stripe_session(
                 instance,
-                payment_type="FINE",
-                amount_cents=int(fine_amount * 100),
-                description=f"Fine for '{instance.book.title}' - {overdue_days} days overdue"
+                request=self.context["request"],
+                amount=fine_amount,
+                description=f"Fine for '{instance.book.title}' - {overdue_days} days overdue",
+                payment_type="FINE"
             )
 
             Payment.objects.create(

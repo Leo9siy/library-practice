@@ -1,5 +1,7 @@
 import stripe
 from django.conf import settings
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import viewsets, permissions
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
@@ -44,8 +46,53 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
 
         return queryset
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="type",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Фильтрация по типу оплаты: PAYMENT или FINE"
+            ),
+            OpenApiParameter(
+                name="status",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Фильтрация по статусу оплаты: PENDING или PAID"
+            )
+        ],
+        responses={200: PaymentSerializer(many=True)},
+        description="Получить список оплат. Обычные пользователи видят только свои, админы — все. Доступна фильтрация по типу и статусу."
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        responses={200: PaymentDetailSerializer},
+        description="Получить подробную информацию об оплате по ID. Доступно только владельцу или админу."
+    )
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
+
 
 class PaymentSuccessView(APIView):
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="session_id",
+                required=True,
+                type=str,
+                location=OpenApiParameter.QUERY
+            )
+        ],
+        responses={
+            200: OpenApiResponse(description="Payment confirmed successfully"),
+            400: OpenApiResponse(description="Invalid or unpaid session")
+        },
+        description="Confirm Stripe payment success via session_id query parameter."
+    )
     def get(self, request):
         session_id = request.query_params.get("session_id")
         if not session_id:
@@ -76,5 +123,11 @@ class PaymentSuccessView(APIView):
 
 
 class PaymentCancelView(APIView):
+    @extend_schema(
+        responses={
+            200: OpenApiResponse(description="Payment was cancelled. Can retry.")
+        },
+        description="Stripe cancel redirect. Informs user that payment failed or was cancelled."
+    )
     def get(self, request):
         return Response({"message": "Payment was cancelled. You can retry later."})

@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -30,7 +32,7 @@ class BorrowingViewSet(viewsets.ModelViewSet):
         serializer.save(user=self.request.user)
 
     def get_permissions(self):
-        if self.action in ["create", "list", "retrieve"]:
+        if self.action in ["create", "list", "retrieve", "return_book"]:
             return [permissions.IsAuthenticated()]
         return [permissions.IsAdminUser()]
 
@@ -57,12 +59,68 @@ class BorrowingViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="is_active",
+                type=OpenApiTypes.BOOL,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="True — активные (не возвращённые) заимствования; False — завершённые."
+            ),
+            OpenApiParameter(
+                name="user_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="(Только для админов) Показывает заимствования указанного пользователя."
+            )
+        ],
+        responses={200: BorrowingSerializer(many=True)},  # ← заменишь на свой сериализатор
+        description="Получить список заимствований. Админы могут фильтровать по пользователю и статусу."
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
+    @extend_schema(
+        request=BorrowingSerializer,
+        responses={201: BorrowingDetailSerializer},
+        description="Создание заимствования. Уменьшает количество книг на складе и создаёт платёж в Stripe."
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @extend_schema(
+        methods=["GET"],
+        description="Check if the book can be returned. No changes made.",
+        responses={
+            200: OpenApiResponse(description="Book can be returned"),
+            400: OpenApiResponse(description="Book already returned"),
+            403: OpenApiResponse(description="Access denied")
+        }
+    )
+    @extend_schema(
+        methods=["POST"],
+        description="Return a borrowed book. Sets actual return date, increases inventory. Creates a fine if overdue.",
+        responses={
+            200: ReturnBorrowingSerializer,
+            400: OpenApiResponse(description="Book already returned or invalid data"),
+            403: OpenApiResponse(description="Only the borrower or admin can return the book.")
+        }
+    )
     @action(detail=True, methods=["POST", "GET"], url_path="return", permission_classes=[permissions.IsAuthenticated])
     def return_book(self, request, pk=None):
         borrowing = self.get_object()
 
-        if self.request.method == "GET":
+        # 🔐 Проверка прав доступа (пользователь — владелец или админ)
+        if borrowing.user != request.user and not request.user.is_staff:
+            return Response(
+                {"detail": "You do not have permission to return this borrowing."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 📖 GET-запрос: просто сообщить можно ли вернуть
+        if request.method == "GET":
             if borrowing.actual_return_date:
                 return Response(
                     {"detail": "Book already returned"},
@@ -73,7 +131,13 @@ class BorrowingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK
             )
 
-        serializer = ReturnBorrowingSerializer(borrowing, data=request.data)
+        # 🔁 POST-запрос: возвращаем книгу
+        serializer = ReturnBorrowingSerializer(
+            borrowing,
+            data=request.data,
+            context = {"request": request},  # <-- вот это добавляем
+            partial = True
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
