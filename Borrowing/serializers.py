@@ -14,9 +14,14 @@ class BorrowingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Borrowing
-        fields = ["id", "book", "borrow_date", "expected_return_date", "actual_return_date"]
+        fields = [
+            "id",
+            "book",
+            "borrow_date",
+            "expected_return_date",
+            "actual_return_date",
+        ]
         read_only_fields = ["id", "borrow_date", "actual_return_date"]
-
 
     def validate_expected_return_date(self, value):
         today = date.today()
@@ -28,7 +33,6 @@ class BorrowingSerializer(serializers.ModelSerializer):
 
         return value
 
-
     def validate(self, data):
 
         user = self.context["request"].user
@@ -38,7 +42,9 @@ class BorrowingSerializer(serializers.ModelSerializer):
         ).exists()
 
         if has_pending:
-            raise serializers.ValidationError({"non_field_errors": ["Unpaid payments detected."]})
+            raise serializers.ValidationError(
+                {"non_field_errors": ["Unpaid payments detected."]}
+            )
 
         book = data["book"]
 
@@ -60,14 +66,16 @@ class BorrowingSerializer(serializers.ModelSerializer):
 
         borrowing = super().create(validated_data)
 
-        money_to_pay = (validated_data["expected_return_date"] - borrowing.borrow_date).days * borrowing.book.daily_fee
+        money_to_pay = (
+            validated_data["expected_return_date"] - borrowing.borrow_date
+        ).days * borrowing.book.daily_fee
 
         session_url, session_id = create_stripe_session(
             borrowing,
             request=request,
             amount=money_to_pay,
             description=f"Payment for: {book.title}",
-            payment_type="PAYMENT"
+            payment_type="PAYMENT",
         )
 
         Payment.objects.create(
@@ -96,8 +104,12 @@ class BorrowingDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Borrowing
         fields = [
-            "id", "user", "book",
-            "borrow_date", "expected_return_date", "actual_return_date",
+            "id",
+            "user",
+            "book",
+            "borrow_date",
+            "expected_return_date",
+            "actual_return_date",
             "payments",
         ]
 
@@ -114,7 +126,9 @@ class ReturnBorrowingSerializer(serializers.ModelSerializer):
 
         pending_fines = self.instance.payments.filter(type="FINE", status="PENDING")
         if pending_fines.exists():
-            raise serializers.ValidationError("Cannot return book: fine payment is pending.")
+            raise serializers.ValidationError(
+                "Cannot return book: fine payment is pending."
+            )
 
         return attrs
 
@@ -127,14 +141,16 @@ class ReturnBorrowingSerializer(serializers.ModelSerializer):
 
         if today > instance.expected_return_date:
             overdue_days = (today - instance.expected_return_date).days
-            fine_amount = overdue_days * instance.book.daily_fee * settings.FINE_MULTIPLIER
+            fine_amount = (
+                overdue_days * instance.book.daily_fee * settings.FINE_MULTIPLIER
+            )
 
             session_url, session_id = create_stripe_session(
                 instance,
                 request=self.context["request"],
                 amount=fine_amount,
                 description=f"Fine for '{instance.book.title}' - {overdue_days} days overdue",
-                payment_type="FINE"
+                payment_type="FINE",
             )
 
             Payment.objects.create(

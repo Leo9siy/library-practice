@@ -12,6 +12,7 @@ from Payment.models import Payment
 
 User = get_user_model()
 
+
 class BorrowingCreateTestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -20,11 +21,7 @@ class BorrowingCreateTestCase(APITestCase):
         self.client.force_authenticate(user=self.user)
 
         self.book = Book.objects.create(
-            title="Test Book",
-            author="Author",
-            cover="HARD",
-            inventory=1,
-            daily_fee=1.5
+            title="Test Book", author="Author", cover="HARD", inventory=1, daily_fee=1.5
         )
 
         self.url = reverse("Borrowing:borrowing-list")
@@ -35,7 +32,7 @@ class BorrowingCreateTestCase(APITestCase):
 
         data = {
             "book": self.book.id,
-            "expected_return_date": date.today() + timedelta(days=7)
+            "expected_return_date": date.today() + timedelta(days=7),
         }
         response = self.client.post(reverse("Borrowing:borrowing-list"), data=data)
 
@@ -47,7 +44,7 @@ class BorrowingCreateTestCase(APITestCase):
         borrowing = Borrowing.objects.create(
             user=self.user,
             book=self.book,
-            expected_return_date=date.today() + timedelta(days=5)
+            expected_return_date=date.today() + timedelta(days=5),
         )
         Payment.objects.create(
             borrowing=borrowing,
@@ -60,7 +57,7 @@ class BorrowingCreateTestCase(APITestCase):
 
         data = {
             "book": self.book.id,
-            "expected_return_date": (date.today() + timedelta(days=5))
+            "expected_return_date": (date.today() + timedelta(days=5)),
         }
 
         response = self.client.post(self.url, data)

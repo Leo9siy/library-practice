@@ -12,8 +12,7 @@ class Command(BaseCommand):
         expiration_time = timezone.now() - timedelta(hours=1)
 
         expired = Payment.objects.filter(
-            status='PENDING',
-            created_at__lt=expiration_time
-        ).update(status='EXPIRED')
+            status="PENDING", created_at__lt=expiration_time
+        ).update(status="EXPIRED")
 
-        self.stdout.write(self.style.SUCCESS(f'Expired {expired} payment(s)'))
+        self.stdout.write(self.style.SUCCESS(f"Expired {expired} payment(s)"))

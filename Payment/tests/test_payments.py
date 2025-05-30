@@ -20,14 +20,12 @@ class PaymentViewSetTestCase(TestCase):
         )
         self.client.force_authenticate(user=self.user)
 
-        self.book = Book.objects.create(
-            title="Test Book", inventory=10, daily_fee=10
-        )
+        self.book = Book.objects.create(title="Test Book", inventory=10, daily_fee=10)
 
         self.borrowing = Borrowing.objects.create(
             user=self.user,
             book=self.book,
-            expected_return_date=date.today() + timedelta(days=5)
+            expected_return_date=date.today() + timedelta(days=5),
         )
 
         self.payment = Payment.objects.create(
@@ -36,7 +34,7 @@ class PaymentViewSetTestCase(TestCase):
             type="PAYMENT",
             money_to_pay=100,
             session_url="https://stripe.com/test",
-            session_id="sess_test"
+            session_id="sess_test",
         )
 
     def test_user_sees_only_own_payments(self):
@@ -46,13 +44,10 @@ class PaymentViewSetTestCase(TestCase):
         other_borrowing = Borrowing.objects.create(
             user=other_user,
             book=self.book,
-            expected_return_date=date.today() + timedelta(days=3)
+            expected_return_date=date.today() + timedelta(days=3),
         )
         Payment.objects.create(
-            borrowing=other_borrowing,
-            status="PAID",
-            type="FINE",
-            money_to_pay=55
+            borrowing=other_borrowing, status="PAID", type="FINE", money_to_pay=55
         )
 
         response = self.client.get(reverse("Payment:payments-list"))
@@ -68,7 +63,7 @@ class PaymentViewSetTestCase(TestCase):
             type="FINE",
             money_to_pay=50,
             session_url="https://stripe.com/fine",
-            session_id="sess_fine"
+            session_id="sess_fine",
         )
 
         response = self.client.get(reverse("Payment:payments-list") + "?type=FINE")
@@ -84,7 +79,7 @@ class PaymentViewSetTestCase(TestCase):
             type="FINE",
             money_to_pay=50,
             session_url="https://stripe.com/paid",
-            session_id="sess_paid"
+            session_id="sess_paid",
         )
 
         response = self.client.get(reverse("Payment:payments-list") + "?status=PAID")
@@ -100,13 +95,10 @@ class PaymentViewSetTestCase(TestCase):
         other_borrowing = Borrowing.objects.create(
             user=other_user,
             book=self.book,
-            expected_return_date=date.today() + timedelta(days=3)
+            expected_return_date=date.today() + timedelta(days=3),
         )
         Payment.objects.create(
-            borrowing=other_borrowing,
-            status="PAID",
-            type="FINE",
-            money_to_pay=77
+            borrowing=other_borrowing, status="PAID", type="FINE", money_to_pay=77
         )
 
         self.user.is_staff = True
@@ -122,7 +114,7 @@ class PaymentViewSetTestCase(TestCase):
         borrowing = Borrowing.objects.create(
             user=self.user,
             book=self.book,
-            expected_return_date=date.today() + timedelta(days=7)
+            expected_return_date=date.today() + timedelta(days=7),
         )
 
         # Фиксируем изначальное количество книг на складе
@@ -154,7 +146,7 @@ class PaymentViewSetTestCase(TestCase):
             type="FINE",
             session_url="https://fake-stripe.com/session",
             session_id="fake_session_id",
-            money_to_pay=100.0
+            money_to_pay=100.0,
         )
 
         url = reverse("Borrowing:borrowing-return-book", args=[self.borrowing.id])
@@ -162,5 +154,3 @@ class PaymentViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("Cannot return book", str(response.data))
-
-

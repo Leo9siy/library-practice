@@ -4,6 +4,7 @@ from rest_framework.reverse import reverse
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+
 def create_stripe_session(
     borrowing,
     request,
@@ -36,10 +37,7 @@ def create_stripe_session(
         mode="payment",
         success_url=success_url,
         cancel_url=cancel_url,
-        metadata={
-            "borrowing_id": str(borrowing.id),
-            "type": payment_type
-        }
+        metadata={"borrowing_id": str(borrowing.id), "type": payment_type},
     )
 
     return session.url, session.id

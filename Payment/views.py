@@ -14,8 +14,11 @@ from Payment.serializers import PaymentSerializer, PaymentDetailSerializer
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+
 class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Payment.objects.select_related("borrowing__user", "borrowing__book").all()
+    queryset = Payment.objects.select_related(
+        "borrowing__user", "borrowing__book"
+    ).all()
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
@@ -53,25 +56,25 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description="Фильтрация по типу оплаты: PAYMENT или FINE"
+                description="Фильтрация по типу оплаты: PAYMENT или FINE",
             ),
             OpenApiParameter(
                 name="status",
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description="Фильтрация по статусу оплаты: PENDING или PAID"
-            )
+                description="Фильтрация по статусу оплаты: PENDING или PAID",
+            ),
         ],
         responses={200: PaymentSerializer(many=True)},
-        description="Получить список оплат. Обычные пользователи видят только свои, админы — все. Доступна фильтрация по типу и статусу."
+        description="Получить список оплат. Обычные пользователи видят только свои, админы — все. Доступна фильтрация по типу и статусу.",
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
     @extend_schema(
         responses={200: PaymentDetailSerializer},
-        description="Получить подробную информацию об оплате по ID. Доступно только владельцу или админу."
+        description="Получить подробную информацию об оплате по ID. Доступно только владельцу или админу.",
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
@@ -84,14 +87,14 @@ class PaymentSuccessView(APIView):
                 name="session_id",
                 required=True,
                 type=str,
-                location=OpenApiParameter.QUERY
+                location=OpenApiParameter.QUERY,
             )
         ],
         responses={
             200: OpenApiResponse(description="Payment confirmed successfully"),
-            400: OpenApiResponse(description="Invalid or unpaid session")
+            400: OpenApiResponse(description="Invalid or unpaid session"),
         },
-        description="Confirm Stripe payment success via session_id query parameter."
+        description="Confirm Stripe payment success via session_id query parameter.",
     )
     def get(self, request):
         session_id = request.query_params.get("session_id")
@@ -127,7 +130,7 @@ class PaymentCancelView(APIView):
         responses={
             200: OpenApiResponse(description="Payment was cancelled. Can retry.")
         },
-        description="Stripe cancel redirect. Informs user that payment failed or was cancelled."
+        description="Stripe cancel redirect. Informs user that payment failed or was cancelled.",
     )
     def get(self, request):
         return Response({"message": "Payment was cancelled. You can retry later."})
