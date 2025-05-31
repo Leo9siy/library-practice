@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 # Quick-start development settings - unsuitable for production
@@ -28,11 +28,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "0") == "1"
-
-ALLOWED_HOSTS = []
 
 # Application definition
 
@@ -80,25 +75,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "Library.wsgi.application"
-
-
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-    # "default": {
-    #     "ENGINE": "django.db.backends.postgresql",
-    #     "NAME": os.getenv("POSTGRES_DB", "library"),
-    #     "USER": os.getenv("POSTGRES_USER", "user"),
-    #     "PASSWORD": os.getenv("POSTGRES_PASSWORD", "password"),
-    #     "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-    #     "PORT": os.getenv("POSTGRES_PORT", "5432"),
-    # }
-}
 
 
 # Password validation
