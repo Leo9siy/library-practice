@@ -33,7 +33,7 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
         return [permissions.IsAdminUser()]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = self.queryset
         user = self.request.user
 
         if not (user.is_staff or user.is_superuser):
@@ -56,25 +56,25 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description="Фильтрация по типу оплаты: PAYMENT или FINE",
+                description="Filter by Type: PAYMENT or FINE",
             ),
             OpenApiParameter(
                 name="status",
                 type=OpenApiTypes.STR,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description="Фильтрация по статусу оплаты: PENDING или PAID",
+                description="Filter by Status: PENDING or PAID",
             ),
         ],
         responses={200: PaymentSerializer(many=True)},
-        description="Получить список оплат. Обычные пользователи видят только свои, админы — все. Доступна фильтрация по типу и статусу.",
+        description="Take payments list. Users by theiself and Admins all. Can filter by Type and Status.",
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
     @extend_schema(
         responses={200: PaymentDetailSerializer},
-        description="Получить подробную информацию об оплате по ID. Доступно только владельцу или админу.",
+        description="Take Payment detail by Id. Access only for admins.",
     )
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
@@ -112,7 +112,6 @@ class PaymentSuccessView(APIView):
                 payment.status = "PAID"
                 payment.save()
 
-                # 🎯 Уведомление
                 send_telegram_message(
                     f"✅ Оплата прошла успешно\n"
                     f"👤 {payment.borrowing.user.email}\n"

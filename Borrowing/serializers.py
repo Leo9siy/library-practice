@@ -37,12 +37,11 @@ class BorrowingSerializer(serializers.ModelSerializer):
     def validate(self, data):
 
         user = self.context["request"].user
-        has_pending = user.borrowings.filter(
-            payments__status="PENDING",
-            user=user,
+        has_unresolved_payments = user.borrowings.filter(
+            payments__status__in=["PENDING", "EXPIRED"],
         ).exists()
 
-        if has_pending:
+        if has_unresolved_payments:
             raise serializers.ValidationError(
                 {"non_field_errors": ["Unpaid payments detected."]}
             )

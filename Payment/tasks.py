@@ -8,7 +8,8 @@ from Payment.models import Payment
 def expire_old_payments():
     expiration_time = timezone.now() - timedelta(hours=1)
     expired_count = Payment.objects.filter(
-        status="PENDING", created_at__lt=expiration_time
+        status="PENDING",
+        created_at__lt=expiration_time
     ).update(status="EXPIRED")
 
     return f"Expired {expired_count} payment(s)"
