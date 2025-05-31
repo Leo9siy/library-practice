@@ -110,7 +110,6 @@ class PaymentViewSetTestCase(TestCase):
         self.assertEqual(len(response.data), 2)
 
     def test_return_book_success(self):
-        # Создаём бронирование
         borrowing = Borrowing.objects.create(
             user=self.user,
             book=self.book,
