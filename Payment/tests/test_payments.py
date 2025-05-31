@@ -133,24 +133,3 @@ class PaymentViewSetTestCase(TestCase):
 
         self.assertIsNotNone(borrowing.actual_return_date)
         self.assertEqual(self.book.inventory, initial_inventory + 1)
-
-    def test_return_book_with_pending_fine_is_blocked(self):
-        # Возвращаем книгу с просрочкой
-        self.borrowing.expected_return_date = date.today() - timedelta(days=5)
-        self.borrowing.save()
-
-        # Создаём штраф вручную
-        Payment.objects.create(
-            borrowing=self.borrowing,
-            status="PENDING",
-            type="FINE",
-            session_url="https://fake-stripe.com/session",
-            session_id="fake_session_id",
-            money_to_pay=100.0,
-        )
-
-        url = reverse("Borrowing:borrowing-return-book", args=[self.borrowing.id])
-        response = self.client.post(url)
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("Cannot return book", str(response.data))

@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 from django.conf import settings
+from django.db import transaction
 from rest_framework import serializers
 from rest_framework.relations import SlugRelatedField
 
@@ -58,34 +59,34 @@ class BorrowingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get("request")
-
         book = validated_data["book"]
-
-        book.inventory -= 1
-        book.save()
-
         borrowing = super().create(validated_data)
 
-        money_to_pay = (
-            validated_data["expected_return_date"] - borrowing.borrow_date
-        ).days * borrowing.book.daily_fee
+        with transaction.atomic():
 
-        session_url, session_id = create_stripe_session(
-            borrowing,
-            request=request,
-            amount=money_to_pay,
-            description=f"Payment for: {book.title}",
-            payment_type="PAYMENT",
-        )
+            book.inventory -= 1
+            book.save()
 
-        Payment.objects.create(
-            borrowing=borrowing,
-            status="PENDING",
-            type="PAYMENT",
-            session_url=session_url,
-            session_id=session_id,
-            money_to_pay=money_to_pay,
-        )
+            money_to_pay = (
+                validated_data["expected_return_date"] - borrowing.borrow_date
+            ).days * borrowing.book.daily_fee
+
+            session_url, session_id = create_stripe_session(
+                borrowing,
+                request=request,
+                amount=money_to_pay,
+                description=f"Payment for: {book.title}",
+                payment_type="PAYMENT",
+            )
+
+            Payment.objects.create(
+                borrowing=borrowing,
+                status="PENDING",
+                type="PAYMENT",
+                session_url=session_url,
+                session_id=session_id,
+                money_to_pay=money_to_pay,
+            )
 
         return borrowing
 
@@ -124,42 +125,42 @@ class ReturnBorrowingSerializer(serializers.ModelSerializer):
         if self.instance.actual_return_date:
             raise serializers.ValidationError("This book is already returned.")
 
-        pending_fines = self.instance.payments.filter(type="FINE", status="PENDING")
-        if pending_fines.exists():
-            raise serializers.ValidationError(
-                "Cannot return book: fine payment is pending."
-            )
-
         return attrs
 
     def update(self, instance, validated_data):
         today = date.today()
-        instance.actual_return_date = today
-        instance.book.inventory += 1
-        instance.book.save()
-        instance.save()
 
-        if today > instance.expected_return_date:
-            overdue_days = (today - instance.expected_return_date).days
-            fine_amount = (
-                overdue_days * instance.book.daily_fee * settings.FINE_MULTIPLIER
-            )
+        with transaction.atomic():
 
-            session_url, session_id = create_stripe_session(
-                instance,
-                request=self.context["request"],
-                amount=fine_amount,
-                description=f"Fine for '{instance.book.title}' - {overdue_days} days overdue",
-                payment_type="FINE",
-            )
+            instance.actual_return_date = today
+            instance.book.inventory += 1
+            instance.book.save()
+            instance.save()
 
-            Payment.objects.create(
-                borrowing=instance,
-                status="PENDING",
-                type="FINE",
-                session_url=session_url,
-                session_id=session_id,
-                money_to_pay=fine_amount,
-            )
+            if today > instance.expected_return_date:
+                payment = instance.payments.filter(type="PAYMENT", status="PAID").first()
+                if not payment:
+                    payment = instance.payments.filter(type="PAYMENT", status="PENDING").first()
+
+                if payment:
+                    overdue_days = (today - instance.expected_return_date).days
+                    fine_amount = (
+                        overdue_days * instance.book.daily_fee * settings.FINE_MULTIPLIER
+                    )
+
+                    session_url, session_id = create_stripe_session(
+                        instance,
+                        request=self.context["request"],
+                        amount=fine_amount,
+                        description=f"Fine for '{instance.book.title}' - {overdue_days} days overdue",
+                        payment_type="FINE",
+                    )
+
+                    payment.type = "FINE"
+                    payment.status = "PENDING"
+                    payment.money_to_pay = fine_amount
+                    payment.session_url = session_url
+                    payment.session_id = session_id
+                    payment.save()
 
         return instance

@@ -2,8 +2,8 @@ import stripe
 from django.conf import settings
 from rest_framework.reverse import reverse
 
-stripe.api_key = settings.STRIPE_SECRET_KEY
 
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 def create_stripe_session(
     borrowing,
@@ -25,7 +25,7 @@ def create_stripe_session(
             {
                 "price_data": {
                     "currency": "usd",
-                    "unit_amount": int(amount * 100),  # cents
+                    "unit_amount": int(amount * 100),
                     "product_data": {
                         "name": f"{payment_type.title()} for: {borrowing.book.title}",
                         "description": description,

@@ -1,6 +1,4 @@
-from django.core.validators import MinValueValidator
 from django.db import models
-from django.utils.translation import gettext as _
 
 
 class Book(models.Model):

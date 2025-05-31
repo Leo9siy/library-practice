@@ -6,7 +6,6 @@ import requests
 
 dotenv.load_dotenv()
 
-
 def send_telegram_message(text):
     token = os.getenv("TELEGRAM_TOKEN")
     chat_id = os.getenv("TELEGRAM_CHAT_ID")

@@ -27,11 +27,6 @@ class BorrowingViewSet(viewsets.ModelViewSet):
 
         return BorrowingSerializer
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context["request"] = self.request
-        return context
-
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
@@ -81,7 +76,7 @@ class BorrowingViewSet(viewsets.ModelViewSet):
         ],
         responses={
             200: BorrowingSerializer(many=True)
-        },  # ← заменишь на свой сериализатор
+        },
         description="Take a Borrowings list, Admin can filter by id.",
     )
     def list(self, request, *args, **kwargs):
@@ -97,7 +92,7 @@ class BorrowingViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         methods=["GET"],
-        description="Check if the book can be returned. No changes made.",
+        description="Check if the book can be returned.",
         responses={
             200: OpenApiResponse(description="Book can be returned"),
             400: OpenApiResponse(description="Book already returned"),
@@ -124,14 +119,12 @@ class BorrowingViewSet(viewsets.ModelViewSet):
     def return_book(self, request, pk=None):
         borrowing = self.get_object()
 
-        # 🔐 Проверка прав доступа (пользователь — владелец или админ)
         if borrowing.user != request.user and not request.user.is_staff:
             return Response(
                 {"detail": "You do not have permission to return this borrowing."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # 📖 GET-запрос: просто сообщить можно ли вернуть
         if request.method == "GET":
             if borrowing.actual_return_date:
                 return Response(
@@ -142,11 +135,10 @@ class BorrowingViewSet(viewsets.ModelViewSet):
                 {"detail": "You can return the book"}, status=status.HTTP_200_OK
             )
 
-        # 🔁 POST-запрос: возвращаем книгу
         serializer = ReturnBorrowingSerializer(
             borrowing,
             data=request.data,
-            context={"request": request},  # <-- вот это добавляем
+            context={"request": request},
             partial=True,
         )
         serializer.is_valid(raise_exception=True)
